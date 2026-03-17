@@ -1,0 +1,62 @@
+[project]
+name = "nanoclaw-mini"
+version = "0.1.4.post4"
+description = "A Codex OAuth-only CLI-first personal AI assistant framework"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "nanoclaw-mini contributors"}
+]
+keywords = ["ai", "agent", "chatbot"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "typer>=0.20.0,<1.0.0",
+    "pydantic>=2.12.0,<3.0.0",
+    "pydantic-settings>=2.12.0,<3.0.0",
+    "httpx>=0.28.0,<1.0.0",
+    "oauth-cli-kit>=0.1.3,<1.0.0",
+    "loguru>=0.7.3,<1.0.0",
+    "rich>=14.0.0,<15.0.0",
+    "croniter>=6.0.0,<7.0.0",
+    "prompt-toolkit>=3.0.50,<4.0.0",
+    "mcp>=1.26.0,<2.0.0",
+    "tiktoken>=0.12.0,<1.0.0",
+]
+
+[project.scripts]
+nanoclaw-mini = "nanoclaw_mini.cli.commands:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build]
+include = [
+    "nanoclaw_mini/**/*.py",
+    "nanoclaw_mini/templates/**/*.md",
+    "nanoclaw_mini/skills/**/*.md",
+    "nanoclaw_mini/skills/**/*.sh",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["nanoclaw_mini"]
+
+[tool.hatch.build.targets.wheel.sources]
+"nanoclaw_mini" = "nanoclaw_mini"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "nanoclaw_mini/",
+    "README.md",
+    "LICENSE",
+]

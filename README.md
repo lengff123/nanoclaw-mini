@@ -54,16 +54,16 @@ nanoclaw-mini agent -m "Hello!"
 如果 `nanoclaw-mini` 没有进入 `PATH`，可以使用模块方式：
 
 ```powershell
-python -m nanobot onboard
-python -m nanobot provider login codex
-python -m nanobot agent -m "Hello!"
+python -m nanoclaw_mini onboard
+python -m nanoclaw_mini provider login codex
+python -m nanoclaw_mini agent -m "Hello!"
 ```
 
 ## 最小配置
 
-默认配置文件路径仍然是：
+默认配置文件路径是：
 
-- `~/.nanobot/config.json`
+- `~/.nanoclaw-mini/config.json`
 
 最小可用配置示例：
 
@@ -77,9 +77,9 @@ python -m nanobot agent -m "Hello!"
 }
 ```
 
-运行 `onboard` 后，默认 workspace 仍然位于：
+运行 `onboard` 后，默认 workspace 位于：
 
-- `~/.nanobot/workspace`
+- `~/.nanoclaw-mini/workspace`
 
 其中会自动同步这些基础文件：
 
@@ -111,8 +111,9 @@ nanoclaw-mini gateway
 ## 说明
 
 - 当前公开项目名是 `nanoclaw-mini`
-- 当前 Python 包目录仍然保留为 `nanobot`，这是为了兼容现有代码结构
-- 默认运行数据目录仍然保留在 `~/.nanobot/`
+- 当前 Python 包目录是 `nanoclaw_mini`
+- 默认运行数据目录是 `~/.nanoclaw-mini/`
+- 如果你之前已经在本机执行过 `pip install -e .`，改名后请重新执行一次安装以刷新命令入口
 
 ## License
 
