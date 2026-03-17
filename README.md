@@ -1,5 +1,9 @@
 # nanoclaw-mini
 
+<p align="center">
+  <img src="./nanoclaw_mini.png" alt="nanoclaw-mini" width="360">
+</p>
+
 `nanoclaw-mini` 是一个基于 Python 的、`CLI-first` 的 AI 基础设施项目。
 
 它来自对 [nanobot](https://github.com/HKUDS/nanobot) 和 [openclaw](https://github.com/openclaw/openclaw) 思路与代码的持续精简与重组，当前版本聚焦在一个更小、更直接、更适合本地工作流的方向上：
