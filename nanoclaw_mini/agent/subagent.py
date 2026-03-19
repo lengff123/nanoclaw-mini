@@ -8,7 +8,6 @@ from typing import Any
 
 from loguru import logger
 
-from nanoclaw_mini.agent.skills import BUILTIN_SKILLS_DIR
 from nanoclaw_mini.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
 from nanoclaw_mini.agent.tools.registry import ToolRegistry
 from nanoclaw_mini.agent.tools.shell import ExecTool
@@ -88,8 +87,7 @@ class SubagentManager:
             # Build subagent tools (no message tool, no spawn tool)
             tools = ToolRegistry()
             allowed_dir = self.workspace if self.restrict_to_workspace else None
-            extra_read = [BUILTIN_SKILLS_DIR] if allowed_dir else None
-            tools.register(ReadFileTool(workspace=self.workspace, allowed_dir=allowed_dir, extra_allowed_dirs=extra_read))
+            tools.register(ReadFileTool(workspace=self.workspace, allowed_dir=allowed_dir))
             tools.register(WriteFileTool(workspace=self.workspace, allowed_dir=allowed_dir))
             tools.register(EditFileTool(workspace=self.workspace, allowed_dir=allowed_dir))
             tools.register(ListDirTool(workspace=self.workspace, allowed_dir=allowed_dir))
@@ -193,7 +191,6 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
     def _build_subagent_prompt(self) -> str:
         """Build a focused system prompt for the subagent."""
         from nanoclaw_mini.agent.context import ContextBuilder
-        from nanoclaw_mini.agent.skills import SkillsLoader
 
         time_ctx = ContextBuilder._build_runtime_context(None, None)
         parts = [f"""# Subagent
@@ -203,11 +200,12 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
 You are a subagent spawned by the main agent to complete a specific task.
 Stay focused on the assigned task. Your final response will be reported back to the main agent.
 ## Workspace
-{self.workspace}"""]
+{self.workspace}
 
-        skills_summary = SkillsLoader(self.workspace).build_skills_summary()
-        if skills_summary:
-            parts.append(f"## Skills\n\nRead SKILL.md with read_file to use a skill.\n\n{skills_summary}")
+## Memory
+- Long-term memory: {self.workspace}/memory/MEMORY.md
+- History log: {self.workspace}/memory/HISTORY.md
+- Use `MEMORY.md` for durable facts and `HISTORY.md` for past events. Read them directly when the task depends on prior context."""] 
 
         return "\n\n".join(parts)
 

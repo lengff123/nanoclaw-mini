@@ -13,7 +13,7 @@
 
 - 本地 CLI 交互
 - Codex OAuth 登录
-- 文件 / Shell / MCP / memory / skills / cron / heartbeat 等基础设施能力
+- 文件 / Shell / memory / cron / heartbeat 等基础设施能力
 
 同时，这个仓库主动移除了大量外围能力，例如：
 
@@ -24,7 +24,7 @@
 
 ## 致谢
 
-感谢上游项目的作者与贡献者为 agent runtime、skills、tooling、交互模式与工程组织方式提供的启发与基础。
+感谢上游项目的作者与贡献者为 agent runtime、tooling、交互模式与工程组织方式提供的启发与基础。
 
 ## License / Notice
 

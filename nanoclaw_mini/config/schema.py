@@ -1,7 +1,6 @@
 """Configuration schema using Pydantic."""
 
 from pathlib import Path
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -76,25 +75,11 @@ class ExecToolConfig(Base):
     path_append: str = ""
 
 
-class MCPServerConfig(Base):
-    """MCP server connection configuration (stdio or HTTP)."""
-
-    type: Literal["stdio", "sse", "streamableHttp"] | None = None
-    command: str = ""
-    args: list[str] = Field(default_factory=list)
-    env: dict[str, str] = Field(default_factory=dict)
-    url: str = ""
-    headers: dict[str, str] = Field(default_factory=dict)
-    tool_timeout: int = 30
-    enabled_tools: list[str] = Field(default_factory=lambda: ["*"])
-
-
 class ToolsConfig(Base):
     """Tools configuration."""
 
     exec: ExecToolConfig = Field(default_factory=ExecToolConfig)
     restrict_to_workspace: bool = False
-    mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)
 
 
 class Config(BaseSettings):

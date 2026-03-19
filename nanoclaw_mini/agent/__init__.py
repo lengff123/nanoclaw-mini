@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-__all__ = ["AgentLoop", "ContextBuilder", "MemoryStore", "SkillsLoader"]
+__all__ = ["AgentLoop", "ContextBuilder", "MemoryStore"]
 
 if TYPE_CHECKING:
     from nanoclaw_mini.agent.context import ContextBuilder
     from nanoclaw_mini.agent.loop import AgentLoop
     from nanoclaw_mini.agent.memory import MemoryStore
-    from nanoclaw_mini.agent.skills import SkillsLoader
 
 
 def __getattr__(name: str) -> Any:
@@ -27,8 +26,4 @@ def __getattr__(name: str) -> Any:
         from nanoclaw_mini.agent.memory import MemoryStore
 
         return MemoryStore
-    if name == "SkillsLoader":
-        from nanoclaw_mini.agent.skills import SkillsLoader
-
-        return SkillsLoader
     raise AttributeError(name)

@@ -11,10 +11,17 @@ import httpx
 from loguru import logger
 from oauth_cli_kit import get_token as get_codex_token
 
-from nanoclaw_mini.providers.base import LLMProvider, LLMResponse, ToolCallRequest
+from nanoclaw_mini.providers.base import (
+    LLMProvider,
+    LLMResponse,
+    ProviderModelInfo,
+    ToolCallRequest,
+)
 
 DEFAULT_CODEX_URL = "https://chatgpt.com/backend-api/codex/responses"
+DEFAULT_CODEX_MODELS_URL = "https://chatgpt.com/backend-api/codex/models"
 DEFAULT_ORIGINATOR = "nanoclaw-mini"
+DEFAULT_LIST_MODELS_CLIENT_VERSION = "1.0.0"
 
 
 class OpenAICodexProvider(LLMProvider):
@@ -76,9 +83,38 @@ class OpenAICodexProvider(LLMProvider):
             )
         except Exception as e:
             return LLMResponse(
-                content=f"Error calling Codex: {str(e)}",
+                content=f"Error calling Codex: {_exception_text(e)}",
                 finish_reason="error",
             )
+
+    async def list_models(self) -> list[ProviderModelInfo]:
+        token = await asyncio.to_thread(get_codex_token)
+        headers = _build_headers(token.account_id, token.access)
+        headers["accept"] = "application/json"
+        headers.pop("content-type", None)
+        params = {"client_version": DEFAULT_LIST_MODELS_CLIENT_VERSION}
+
+        try:
+            try:
+                payload = await _request_json(
+                    DEFAULT_CODEX_MODELS_URL,
+                    headers,
+                    params=params,
+                    verify=True,
+                )
+            except Exception as e:
+                if "CERTIFICATE_VERIFY_FAILED" not in str(e):
+                    raise
+                logger.warning("SSL certificate verification failed for Codex models API; retrying with verify=False")
+                payload = await _request_json(
+                    DEFAULT_CODEX_MODELS_URL,
+                    headers,
+                    params=params,
+                    verify=False,
+                )
+            return _parse_model_infos(payload)
+        except Exception as exc:
+            raise RuntimeError(f"Error listing Codex models: {_exception_text(exc)}") from exc
 
     def get_default_model(self) -> str:
         return self.default_model
@@ -102,6 +138,62 @@ def _build_headers(account_id: str, token: str) -> dict[str, str]:
     }
 
 
+def _parse_model_infos(payload: dict[str, Any]) -> list[ProviderModelInfo]:
+    rows = payload.get("models")
+    if not isinstance(rows, list):
+        raise RuntimeError("Codex model list response did not include a models array.")
+
+    models: list[ProviderModelInfo] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        slug = str(row.get("slug") or "").strip()
+        if not slug:
+            continue
+        supported_reasoning_levels = tuple(
+            str(item.get("effort"))
+            for item in row.get("supported_reasoning_levels", [])
+            if isinstance(item, dict) and item.get("effort")
+        )
+        models.append(
+            ProviderModelInfo(
+                id=f"openai-codex/{slug}",
+                slug=slug,
+                display_name=str(row.get("display_name") or slug),
+                description=str(row.get("description") or ""),
+                context_window=_as_int(row.get("context_window")),
+                default_reasoning_level=_as_str(row.get("default_reasoning_level")),
+                supported_reasoning_levels=supported_reasoning_levels,
+                visibility=_as_str(row.get("visibility")),
+                supported_in_api=_as_bool(row.get("supported_in_api")),
+                priority=_as_int(row.get("priority")),
+            )
+        )
+
+    return sorted(
+        models,
+        key=lambda item: (
+            item.priority if item.priority is not None else 10_000,
+            item.display_name.lower(),
+        ),
+    )
+
+
+def _as_int(value: Any) -> int | None:
+    return value if isinstance(value, int) else None
+
+
+def _as_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _as_bool(value: Any) -> bool | None:
+    return value if isinstance(value, bool) else None
+
+
 async def _request_codex(
     url: str,
     headers: dict[str, str],
@@ -114,6 +206,34 @@ async def _request_codex(
                 text = await response.aread()
                 raise RuntimeError(_friendly_error(response.status_code, text.decode("utf-8", "ignore")))
             return await _consume_sse(response)
+
+
+async def _request_json(
+    url: str,
+    headers: dict[str, str],
+    *,
+    params: dict[str, Any] | None = None,
+    verify: bool,
+) -> dict[str, Any]:
+    try:
+        return await _request_json_once(url, headers, params=params, verify=verify, trust_env=True)
+    except httpx.ConnectError:
+        return await _request_json_once(url, headers, params=params, verify=verify, trust_env=False)
+
+
+async def _request_json_once(
+    url: str,
+    headers: dict[str, str],
+    *,
+    params: dict[str, Any] | None = None,
+    verify: bool,
+    trust_env: bool,
+) -> dict[str, Any]:
+    async with httpx.AsyncClient(timeout=30.0, verify=verify, trust_env=trust_env) as client:
+        response = await client.get(url, headers=headers, params=params)
+        if response.status_code != 200:
+            raise RuntimeError(_friendly_error(response.status_code, response.text))
+        return response.json()
 
 
 def _convert_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -315,3 +435,8 @@ def _friendly_error(status_code: int, raw: str) -> str:
     if status_code == 429:
         return "ChatGPT usage quota exceeded or rate limit triggered. Please try again later."
     return f"HTTP {status_code}: {raw}"
+
+
+def _exception_text(exc: Exception) -> str:
+    text = str(exc).strip()
+    return text or exc.__class__.__name__

@@ -7,7 +7,6 @@ import json
 import os
 import re
 import sys
-from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
@@ -17,7 +16,6 @@ from nanoclaw_mini.agent.context import ContextBuilder
 from nanoclaw_mini.agent.memory import MemoryConsolidator
 from nanoclaw_mini.agent.subagent import SubagentManager
 from nanoclaw_mini.agent.tools.cron import CronTool
-from nanoclaw_mini.agent.skills import BUILTIN_SKILLS_DIR
 from nanoclaw_mini.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
 from nanoclaw_mini.agent.tools.message import MessageTool
 from nanoclaw_mini.agent.tools.registry import ToolRegistry
@@ -39,7 +37,7 @@ class AgentLoop:
 
     It:
     1. Receives messages from the bus
-    2. Builds context with history, memory, skills
+    2. Builds context with history and memory
     3. Calls the LLM
     4. Executes tool calls
     5. Sends responses back
@@ -59,7 +57,6 @@ class AgentLoop:
         cron_service: CronService | None = None,
         restrict_to_workspace: bool = False,
         session_manager: SessionManager | None = None,
-        mcp_servers: dict | None = None,
         interaction_config: InteractionConfig | None = None,
     ):
         from nanoclaw_mini.config.schema import ExecToolConfig
@@ -88,10 +85,6 @@ class AgentLoop:
         )
 
         self._running = False
-        self._mcp_servers = mcp_servers or {}
-        self._mcp_stack: AsyncExitStack | None = None
-        self._mcp_connected = False
-        self._mcp_connecting = False
         self._active_tasks: dict[str, list[asyncio.Task]] = {}  # session_key -> tasks
         self._background_tasks: list[asyncio.Task] = []
         self._processing_lock = asyncio.Lock()
@@ -109,8 +102,7 @@ class AgentLoop:
     def _register_default_tools(self) -> None:
         """Register the default set of tools."""
         allowed_dir = self.workspace if self.restrict_to_workspace else None
-        extra_read = [BUILTIN_SKILLS_DIR] if allowed_dir else None
-        self.tools.register(ReadFileTool(workspace=self.workspace, allowed_dir=allowed_dir, extra_allowed_dirs=extra_read))
+        self.tools.register(ReadFileTool(workspace=self.workspace, allowed_dir=allowed_dir))
         for cls in (WriteFileTool, EditFileTool, ListDirTool):
             self.tools.register(cls(workspace=self.workspace, allowed_dir=allowed_dir))
         self.tools.register(ExecTool(
@@ -123,28 +115,6 @@ class AgentLoop:
         self.tools.register(SpawnTool(manager=self.subagents))
         if self.cron_service:
             self.tools.register(CronTool(self.cron_service))
-
-    async def _connect_mcp(self) -> None:
-        """Connect to configured MCP servers (one-time, lazy)."""
-        if self._mcp_connected or self._mcp_connecting or not self._mcp_servers:
-            return
-        self._mcp_connecting = True
-        from nanoclaw_mini.agent.tools.mcp import connect_mcp_servers
-        try:
-            self._mcp_stack = AsyncExitStack()
-            await self._mcp_stack.__aenter__()
-            await connect_mcp_servers(self._mcp_servers, self.tools, self._mcp_stack)
-            self._mcp_connected = True
-        except BaseException as e:
-            logger.error("Failed to connect MCP servers (will retry next message): {}", e)
-            if self._mcp_stack:
-                try:
-                    await self._mcp_stack.aclose()
-                except Exception:
-                    pass
-                self._mcp_stack = None
-        finally:
-            self._mcp_connecting = False
 
     def _set_tool_context(self, channel: str, chat_id: str, message_id: str | None = None) -> None:
         """Update context for all tools that need routing info."""
@@ -247,7 +217,6 @@ class AgentLoop:
     async def run(self) -> None:
         """Run the agent loop, dispatching messages as tasks to stay responsive to /stop."""
         self._running = True
-        await self._connect_mcp()
         logger.info("Agent loop started")
 
         while self._running:
@@ -321,17 +290,11 @@ class AgentLoop:
                     content="Sorry, I encountered an error.",
                 ))
 
-    async def close_mcp(self) -> None:
-        """Drain pending background archives, then close MCP connections."""
+    async def close(self) -> None:
+        """Drain pending background tasks before shutdown."""
         if self._background_tasks:
             await asyncio.gather(*self._background_tasks, return_exceptions=True)
             self._background_tasks.clear()
-        if self._mcp_stack:
-            try:
-                await self._mcp_stack.aclose()
-            except (RuntimeError, BaseExceptionGroup):
-                pass  # MCP SDK cancel scope cleanup is noisy but harmless
-            self._mcp_stack = None
 
     def _schedule_background(self, coro) -> None:
         """Schedule a coroutine as a tracked background task (drained on shutdown)."""
@@ -490,7 +453,6 @@ class AgentLoop:
         on_progress: Callable[[str], Awaitable[None]] | None = None,
     ) -> str:
         """Process a message directly (for CLI or cron usage)."""
-        await self._connect_mcp()
         msg = InboundMessage(channel=channel, sender_id="user", chat_id=chat_id, content=content)
         response = await self._process_message(msg, session_key=session_key, on_progress=on_progress)
         return response.content if response else ""

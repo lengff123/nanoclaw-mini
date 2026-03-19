@@ -39,7 +39,7 @@ python -m nanoclaw_mini onboard
 nanoclaw-mini provider login codex
 ```
 
-你也可以使用等价名称：
+也可以使用等价名称：
 
 ```powershell
 nanoclaw-mini provider login openai-codex
@@ -104,8 +104,7 @@ nanoclaw-mini status
     "exec": {
       "timeout": 60,
       "pathAppend": ""
-    },
-    "mcpServers": {}
+    }
   }
 }
 ```
@@ -154,7 +153,7 @@ nanoclaw-mini status
 nanoclaw-mini gateway
 ```
 
-这里的 `gateway` 不再监听网络端口，它当前只负责：
+当前 `gateway` 不监听对外网络端口，主要负责：
 
 - 运行 `cron`
 - 运行 `heartbeat`
@@ -172,7 +171,7 @@ nanoclaw-mini gateway
 - `TOOLS.md`：工具约束说明
 - `HEARTBEAT.md`：heartbeat 检查任务来源
 - `memory/MEMORY.md`：长期记忆
-- `skills/<name>/SKILL.md`：自定义技能
+- `memory/HISTORY.md`：历史事件归档
 
 ## 7. 文件与命令能力
 
@@ -191,37 +190,9 @@ nanoclaw-mini gateway
 
 - `exec` 带有基础安全拦截，危险命令和内网 URL 会被阻止
 - 当 `tools.restrictToWorkspace=true` 时，文件和命令能力会更严格地限制在 workspace 内
-- `cron` 工具需要通过 agent 使用，不是单独的 CLI 子命令
+- `cron` 需要通过 agent 使用，不是独立的 CLI 子命令
 
-## 8. MCP 配置示例
-
-如果你要接 MCP server，可以在配置里补 `tools.mcpServers`。
-
-示例：
-
-```json
-{
-  "tools": {
-    "mcpServers": {
-      "filesystem": {
-        "type": "stdio",
-        "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
-        "toolTimeout": 30,
-        "enabledTools": ["*"]
-      }
-    }
-  }
-}
-```
-
-支持的 MCP transport：
-
-- `stdio`
-- `sse`
-- `streamableHttp`
-
-## 9. 定时任务与 Heartbeat
+## 8. 定时任务与 Heartbeat
 
 `gateway` 模式下会启用：
 
@@ -234,7 +205,7 @@ nanoclaw-mini gateway
 - `heartbeat` 会周期性读取 workspace 下的 `HEARTBEAT.md`
 - 当 heartbeat 判断存在待执行任务时，会将任务送入完整 agent loop
 
-## 10. 常见问题
+## 9. 常见问题
 
 ### 1. `nanoclaw-mini` 命令不可用
 

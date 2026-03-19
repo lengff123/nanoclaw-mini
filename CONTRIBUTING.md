@@ -5,8 +5,8 @@
 ## 建议的贡献方向
 
 - 改进 CLI 体验
-- 改进 workspace / memory / skills 协同
-- 改进 MCP、cron、heartbeat 等基础设施能力
+- 改进 workspace / memory 协同
+- 改进 cron、heartbeat 等基础设施能力
 - 改进文档、安装流程与公开仓库说明
 - 清理历史兼容层和死代码
 

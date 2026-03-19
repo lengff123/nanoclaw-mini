@@ -52,6 +52,22 @@ class LLMResponse:
 
 
 @dataclass(frozen=True)
+class ProviderModelInfo:
+    """Metadata for one remotely available model."""
+
+    id: str
+    slug: str
+    display_name: str
+    description: str = ""
+    context_window: int | None = None
+    default_reasoning_level: str | None = None
+    supported_reasoning_levels: tuple[str, ...] = ()
+    visibility: str | None = None
+    supported_in_api: bool | None = None
+    priority: int | None = None
+
+
+@dataclass(frozen=True)
 class GenerationSettings:
     """Default generation parameters for LLM calls.
 
@@ -109,7 +125,7 @@ class LLMProvider(ABC):
     def _sanitize_empty_content(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Replace empty text content that causes provider 400 errors.
 
-        Empty content can appear when MCP tools return nothing. Most providers
+        Empty content can appear when tool calls return nothing. Most providers
         reject empty-string content or empty text blocks in list content.
         """
         result: list[dict[str, Any]] = []
@@ -191,6 +207,10 @@ class LLMProvider(ABC):
             LLMResponse with content and/or tool calls.
         """
         pass
+
+    async def list_models(self) -> list[ProviderModelInfo]:
+        """Return remotely available models for the active provider."""
+        raise NotImplementedError("This provider does not implement model listing.")
 
     @classmethod
     def _is_transient_error(cls, content: str | None) -> bool:

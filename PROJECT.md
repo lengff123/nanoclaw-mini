@@ -12,7 +12,6 @@
 - 技能系统
 - 子代理协作
 - 后台调度与 heartbeat
-- 与 MCP 生态的连接
 
 ## 当前定位
 
@@ -45,7 +44,7 @@
 
 ### 4. 组合优于堆叠
 
-通过 `skills`、`MCP`、`subagent`、`cron` 这些可组合模块来增强能力，而不是不断叠加分散入口。
+通过 `subagent`、`cron` 这些可组合模块来增强能力，而不是不断叠加分散入口。
 
 ### 5. 以长期维护为前提
 
@@ -58,11 +57,9 @@
 - 文件工具
 - Shell 工具与安全防护
 - Session / Memory
-- Skills
 - Subagent
 - Cron
 - Heartbeat
-- MCP
 
 ## 当前主动裁剪的范围
 
@@ -76,8 +73,8 @@
 
 - 继续打磨本地 agent runtime 的稳定性
 - 继续收紧无用耦合和历史兼容层
-- 让 workspace、memory、skills 的协同更清晰
-- 提升调度、子代理与 MCP 的组合能力
+- 让 workspace、memory 的协同更清晰
+- 提升调度与子代理的组合能力
 - 保持文档、安装体验和公开仓库形态更清楚
 
 ## 非目标

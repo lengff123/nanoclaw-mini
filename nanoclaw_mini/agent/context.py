@@ -9,7 +9,6 @@ from typing import Any
 from nanoclaw_mini.utils.helpers import current_time_str
 
 from nanoclaw_mini.agent.memory import MemoryStore
-from nanoclaw_mini.agent.skills import SkillsLoader
 from nanoclaw_mini.utils.helpers import build_assistant_message, detect_image_mime
 
 
@@ -22,10 +21,9 @@ class ContextBuilder:
     def __init__(self, workspace: Path):
         self.workspace = workspace
         self.memory = MemoryStore(workspace)
-        self.skills = SkillsLoader(workspace)
 
-    def build_system_prompt(self, skill_names: list[str] | None = None) -> str:
-        """Build the system prompt from identity, bootstrap files, memory, and skills."""
+    def build_system_prompt(self) -> str:
+        """Build the system prompt from identity, bootstrap files, and memory."""
         parts = [self._get_identity()]
 
         bootstrap = self._load_bootstrap_files()
@@ -35,21 +33,6 @@ class ContextBuilder:
         memory = self.memory.get_memory_context()
         if memory:
             parts.append(f"# Memory\n\n{memory}")
-
-        always_skills = self.skills.get_always_skills()
-        if always_skills:
-            always_content = self.skills.load_skills_for_context(always_skills)
-            if always_content:
-                parts.append(f"# Active Skills\n\n{always_content}")
-
-        skills_summary = self.skills.build_skills_summary()
-        if skills_summary:
-            parts.append(f"""# Skills
-
-The following skills extend your capabilities. To use a skill, read its SKILL.md file using the read_file tool.
-Skills with available="false" need dependencies installed first - you can try installing them with apt/brew.
-
-{skills_summary}""")
 
         return "\n\n---\n\n".join(parts)
 
@@ -83,7 +66,14 @@ You are nanoclaw-mini, a helpful AI assistant.
 Your workspace is at: {workspace_path}
 - Long-term memory: {workspace_path}/memory/MEMORY.md (write important facts here)
 - History log: {workspace_path}/memory/HISTORY.md (grep-searchable). Each entry starts with [YYYY-MM-DD HH:MM].
-- Custom skills: {workspace_path}/skills/{{skill-name}}/SKILL.md
+
+## Memory Model
+- `memory/MEMORY.md` stores durable facts such as user preferences, project context, and long-lived decisions. It is loaded into your context.
+- `memory/HISTORY.md` is an append-only event log for past conversations and actions. It is not loaded automatically; read it directly when needed.
+- For small history files, use `read_file`. For large history files, prefer targeted searches with `exec`.
+- Update `MEMORY.md` promptly when you learn stable information that should persist across sessions.
+- Do not use `MEMORY.md` or `HISTORY.md` as a reminder system. Use `cron` or `HEARTBEAT.md` for scheduled and recurring tasks.
+- Old conversations may be consolidated into `HISTORY.md` and `MEMORY.md` automatically.
 
 {platform_policy}
 
@@ -111,15 +101,30 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
             file_path = self.workspace / filename
             if file_path.exists():
                 content = file_path.read_text(encoding="utf-8")
+                content = self._normalize_bootstrap_content(filename, content)
                 parts.append(f"## {filename}\n\n{content}")
 
         return "\n\n".join(parts) if parts else ""
+
+    @staticmethod
+    def _normalize_bootstrap_content(filename: str, content: str) -> str:
+        """Strip stale skill-era guidance from older workspace templates."""
+        if filename == "AGENTS.md":
+            return content.replace(
+                "Before scheduling reminders, check available skills and follow skill guidance first.\n",
+                "",
+            )
+        if filename == "TOOLS.md":
+            return content.replace(
+                "- Please refer to cron skill for usage.\n",
+                "- Use the built-in `cron` tool directly for add/list/remove operations.\n",
+            )
+        return content
 
     def build_messages(
         self,
         history: list[dict[str, Any]],
         current_message: str,
-        skill_names: list[str] | None = None,
         media: list[str] | None = None,
         channel: str | None = None,
         chat_id: str | None = None,
@@ -136,7 +141,7 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
             merged = [{"type": "text", "text": runtime_ctx}] + user_content
 
         return [
-            {"role": "system", "content": self.build_system_prompt(skill_names)},
+            {"role": "system", "content": self.build_system_prompt()},
             *history,
             {"role": "user", "content": merged},
         ]

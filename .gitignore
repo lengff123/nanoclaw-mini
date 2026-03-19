@@ -23,3 +23,12 @@ botpy.log
 nano.*.save
 .DS_Store
 uv.lock
+nanoclaw-mini-desktop/target/
+Thumbs.db
+.vscode/
+.idea/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.log

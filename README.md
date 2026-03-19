@@ -10,7 +10,7 @@
 
 - 只保留 `OpenAI Codex OAuth` 授权登录
 - 只保留本地 `CLI` 交互
-- 保留文件、Shell、MCP、记忆、技能、子代理、定时任务与 heartbeat 等核心基础设施能力
+- 保留文件、Shell、记忆、子代理、定时任务与 heartbeat 等核心基础设施能力
 - 移除多渠道接入、网页搜索/抓取、API Key provider、网络暴露式 gateway 等外围能力
 
 ## 项目定位
@@ -21,9 +21,8 @@
 
 - 本地代码与文档协作
 - 基于工作区文件的长期 AI 助手
-- 通过 `MCP` 接第三方工具能力
 - 通过 `cron` 和 `heartbeat` 承载长期运行任务
-- 持续沉淀可复用的 skill、memory 与 agent workflow
+- 持续沉淀可复用的 memory 与 agent workflow
 
 ## 核心能力
 
@@ -31,9 +30,7 @@
 - `CLI chat`：支持单次调用和交互式对话
 - `Filesystem tools`：读、写、编辑、列目录
 - `Shell tool`：带基础安全防护的命令执行
-- `MCP support`：可挂接 stdio / SSE / streamable HTTP MCP server
 - `Memory + Session`：会话持久化与记忆整合
-- `Skills`：支持内置与 workspace 自定义技能
 - `Subagents`：支持后台子代理执行
 - `Gateway`：支持 cron 与 heartbeat 后台运行
 
@@ -99,6 +96,9 @@ python -m nanoclaw_mini agent -m "Hello!"
 ```powershell
 nanoclaw-mini onboard
 nanoclaw-mini provider login codex
+nanoclaw-mini models list
+nanoclaw-mini models choose
+nanoclaw-mini models set gpt-5.4-mini
 nanoclaw-mini status
 nanoclaw-mini agent
 nanoclaw-mini agent -m "Summarize this project"
@@ -107,10 +107,11 @@ nanoclaw-mini gateway
 
 ## 文档导航
 
-- [USAGE.md](./USAGE.md): 安装、登录、配置、命令、MCP 与常见问题
+- [USAGE.md](./USAGE.md): 安装、登录、配置、命令与常见问题
 - [PROJECT.md](./PROJECT.md): 项目定位、设计原则、当前边界与长期方向
 - [ACKNOWLEDGEMENTS.md](./ACKNOWLEDGEMENTS.md): 上游来源、关系说明与致谢
 - [CONTRIBUTING.md](./CONTRIBUTING.md): 提交 issue / PR 与本地检查建议
+- [nanoclaw-mini-desktop/README.md](./nanoclaw-mini-desktop/README.md): Rust 桌面安装器 / 更新器
 
 ## 说明
 
