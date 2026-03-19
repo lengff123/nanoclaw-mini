@@ -1,7 +1,6 @@
 """CLI commands for nanoclaw-mini."""
 
 import asyncio
-import json
 import os
 import select
 import signal
@@ -29,7 +28,6 @@ from prompt_toolkit.patch_stdout import patch_stdout
 from prompt_toolkit.application import run_in_terminal
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.table import Table
 from rich.text import Text
 
 from nanoclaw_mini import __logo__, __version__
@@ -305,31 +303,6 @@ def _load_editable_config(config: str | None = None) -> tuple[Config, Path]:
 
     loaded = load_config(config_path)
     return loaded, get_config_path()
-
-
-def _normalize_codex_model(model: str) -> str:
-    """Accept bare slugs and normalize them to the configured model format."""
-    normalized = model.strip()
-    if not normalized:
-        raise typer.BadParameter("Model name cannot be empty.")
-    if normalized.startswith("openai_codex/"):
-        return "openai-codex/" + normalized.split("/", 1)[1]
-    if normalized.startswith("openai-codex/"):
-        return normalized
-    return f"openai-codex/{normalized}"
-
-
-def _short_context_window(value: int | None) -> str:
-    if value is None:
-        return "-"
-    if value >= 1000 and value % 1000 == 0:
-        return f"{value // 1000}k"
-    return str(value)
-
-
-def _current_model_matches(current_model: str, candidate_id: str, candidate_slug: str) -> bool:
-    current = _normalize_codex_model(current_model)
-    return current == candidate_id or current.endswith("/" + candidate_slug)
 
 
 def _print_deprecated_memory_window_notice(config: Config) -> None:
@@ -718,153 +691,6 @@ def _get_bridge_dir() -> Path:
     if False:
 
         console.print("[green]✓[/green] Bridge ready\n")
-
-
-# ============================================================================
-# Model Commands
-# ============================================================================
-
-models_app = typer.Typer(help="List and switch Codex models")
-app.add_typer(models_app, name="models")
-
-
-def _fetch_codex_models(config: Config):
-    provider = _make_provider(config)
-    try:
-        return asyncio.run(provider.list_models())
-    except RuntimeError as exc:
-        message = str(exc)
-        if "OAuth credentials not found" in message:
-            console.print("[red]Not logged in.[/red] Run [cyan]nanoclaw-mini provider login codex[/cyan] first.")
-            raise typer.Exit(1)
-        console.print(f"[red]Failed to fetch Codex models:[/red] {message}")
-        raise typer.Exit(1)
-
-
-@models_app.command("list")
-def models_list(
-    config: str | None = typer.Option(None, "--config", "-c", help="Path to config file"),
-    json_output: bool = typer.Option(False, "--json", help="Print raw model data as JSON"),
-):
-    """Fetch the available Codex models for the current login."""
-    loaded, _ = _load_editable_config(config)
-    current_model = loaded.agents.defaults.model
-    models = _fetch_codex_models(loaded)
-
-    if json_output:
-        payload = [
-            {
-                "id": model.id,
-                "slug": model.slug,
-                "displayName": model.display_name,
-                "description": model.description,
-                "contextWindow": model.context_window,
-                "defaultReasoningLevel": model.default_reasoning_level,
-                "supportedReasoningLevels": list(model.supported_reasoning_levels),
-                "visibility": model.visibility,
-                "supportedInApi": model.supported_in_api,
-                "priority": model.priority,
-                "isCurrent": _current_model_matches(current_model, model.id, model.slug),
-            }
-            for model in models
-        ]
-        console.print_json(json=json.dumps(payload, ensure_ascii=False))
-        return
-
-    table = Table(title="Available Codex Models")
-    table.add_column("Current", style="cyan", no_wrap=True)
-    table.add_column("Model", style="bold")
-    table.add_column("Reasoning", style="magenta")
-    table.add_column("Context", justify="right")
-    table.add_column("Description", overflow="fold")
-
-    for model in models:
-        current_marker = "*" if _current_model_matches(current_model, model.id, model.slug) else ""
-        reasoning = model.default_reasoning_level or "-"
-        if model.supported_reasoning_levels:
-            reasoning = f"{reasoning} ({', '.join(model.supported_reasoning_levels)})"
-        description = model.description or "-"
-        table.add_row(
-            current_marker,
-            model.id,
-            reasoning,
-            _short_context_window(model.context_window),
-            description,
-        )
-
-    console.print(table)
-    console.print(f"[dim]Current model: {current_model}[/dim]")
-
-
-@models_app.command("set")
-def models_set(
-    model: str = typer.Argument(..., help="Model slug or full model id"),
-    config: str | None = typer.Option(None, "--config", "-c", help="Path to config file"),
-    force: bool = typer.Option(False, "--force", help="Set the model even if remote validation fails"),
-):
-    """Set the default model in config.json."""
-    from nanoclaw_mini.config.loader import save_config
-
-    loaded, config_path = _load_editable_config(config)
-    selected = _normalize_codex_model(model)
-    available_models = None
-
-    if not force:
-        try:
-            available_models = _fetch_codex_models(loaded)
-        except typer.Exit:
-            console.print("[yellow]Skipping remote validation. Use --force to silence this warning.[/yellow]")
-
-    if available_models is not None:
-        available_ids = {item.id for item in available_models}
-        available_slugs = {item.slug for item in available_models}
-        if selected not in available_ids and selected.split("/", 1)[1] not in available_slugs:
-            console.print(f"[red]Model not found in the current Codex account:[/red] {selected}")
-            console.print("Run [cyan]nanoclaw-mini models list[/cyan] to inspect the available models, or pass [cyan]--force[/cyan].")
-            raise typer.Exit(1)
-
-    previous = loaded.agents.defaults.model
-    loaded.agents.defaults.model = selected
-    save_config(loaded, config_path)
-
-    console.print("[green]Updated default model[/green]")
-    console.print(f"  From: [dim]{previous}[/dim]")
-    console.print(f"  To:   [cyan]{selected}[/cyan]")
-    console.print(f"  Config: [dim]{config_path}[/dim]")
-
-
-@models_app.command("choose")
-def models_choose(
-    config: str | None = typer.Option(None, "--config", "-c", help="Path to config file"),
-):
-    """Interactively choose a model from the current Codex account."""
-    from nanoclaw_mini.config.loader import save_config
-
-    loaded, config_path = _load_editable_config(config)
-    current_model = loaded.agents.defaults.model
-    models = _fetch_codex_models(loaded)
-
-    console.print(f"{__logo__} Choose a Codex model\n")
-    for index, model in enumerate(models, start=1):
-        current_marker = " [current]" if _current_model_matches(current_model, model.id, model.slug) else ""
-        reasoning = model.default_reasoning_level or "-"
-        console.print(f"{index}. [cyan]{model.id}[/cyan]{current_marker}")
-        console.print(f"   reasoning: {reasoning}")
-        if model.description:
-            console.print(f"   {model.description}")
-
-    choice = typer.prompt("Select a model number", type=int)
-    if choice < 1 or choice > len(models):
-        console.print(f"[red]Invalid selection:[/red] {choice}")
-        raise typer.Exit(1)
-
-    selected = models[choice - 1].id
-    loaded.agents.defaults.model = selected
-    save_config(loaded, config_path)
-
-    console.print(f"[green]Selected model:[/green] [cyan]{selected}[/cyan]")
-    console.print(f"[dim]Saved to {config_path}[/dim]")
-
 
 # ============================================================================
 # Status Commands

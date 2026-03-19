@@ -96,9 +96,6 @@ python -m nanoclaw_mini agent -m "Hello!"
 ```powershell
 nanoclaw-mini onboard
 nanoclaw-mini provider login codex
-nanoclaw-mini models list
-nanoclaw-mini models choose
-nanoclaw-mini models set gpt-5.4-mini
 nanoclaw-mini status
 nanoclaw-mini agent
 nanoclaw-mini agent -m "Summarize this project"
